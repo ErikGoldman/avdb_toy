@@ -10,9 +10,15 @@ struct WorldSettings
     int Iterations = 4;
 
     // how much to increase K each step
-    float Beta = 10;
+    float Beta = 10.f;
 
-    float LambdaMin = 10, LambdaMax = 2e8;
+    // how much to decrease k during a warm start
+    float Gamma = 0.99f;
+
+    // how much extra to decrease lambda during a warm start
+    float Alpha = 0.95f;
+
+    float LambdaMin = -2e8, LambdaMax = -LambdaMin;
 };
 
 class World final
@@ -25,6 +31,10 @@ public:
     World(): Constraints{}, ConstraintHeads{}, Bodies{}
     {
         memset(ConstraintHeads, INVALID, sizeof(ConstraintHeads));
+        for (ConstraintIndex i = 0; i < MAX_CONSTRAINTS; ++i)
+        {
+            Constraints[i].Next = i + 2;
+        }
     }
 
     void Step(float Dt);
@@ -63,53 +73,13 @@ public:
 
     ConstraintIndex GetStartConstraint(const BodyIndex Bi) const
     {
-        return ConstraintHeads[Bi];
+        return ConstraintHeads[Bi - 1];
     }
 
     void AddConstraint(BodyIndex A, BodyIndex B, ConstraintType Type, Vector2 Normal, float Rest, float K,
-        float Lambda = 0.0f)
-    {
-        if (NextFreeConstraintIndexPlusOne == INVALID)
-        {
-            throw std::runtime_error("Too many bodies");
-        }
+        float LambdaMin, float LambdaMax);
 
-        Constraint &New = Constraints[NextFreeConstraintIndexPlusOne - 1];
-        New.A = A;
-        New.B = B;
-        New.Type = Type;
-        New.Normal = Normal;
-        New.Rest = Rest;
-        New.K = K;
-        New.Lambda = Lambda;
-
-        // splice into linked lists
-        const ConstraintIndex NextFree = New.Next;
-        New.Next = NextActiveConstraintIndexPlusOne;
-        NextActiveConstraintIndexPlusOne = NextFreeConstraintIndexPlusOne;
-        NextFreeConstraintIndexPlusOne = NextFree;
-
-        if (A != INVALID)
-        {
-            New.NextA = ConstraintHeads[A];
-            ConstraintHeads[A] = NextActiveConstraintIndexPlusOne;
-        }
-        else
-        {
-            New.NextA = INVALID;
-        }
-        if (B != INVALID)
-        {
-            New.NextB = ConstraintHeads[B];
-            ConstraintHeads[B] = NextActiveConstraintIndexPlusOne;
-        }
-        else
-        {
-            New.NextB = INVALID;
-        }
-    }
-
-    int GetNumBodies() const
+    BodyIndex GetNumBodies() const
     {
         return NumBodies;
     }

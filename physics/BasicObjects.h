@@ -104,6 +104,22 @@ struct Vector2
         return {X * F, Y * F};
     }
 
+    Vector2 GetNormal() const
+    {
+        const float length = sqrtf(Dot(*this));
+        return { X / length, Y / length };
+    }
+
+    float Dot(const Vector2 &Other) const
+    {
+        return X * Other.X + Y * Other.Y;
+    }
+
+    float Length() const
+    {
+        return sqrtf(X * X + Y * Y);
+    }
+
     float SqLength() const
     {
         return X * X + Y * Y;
@@ -152,4 +168,5 @@ struct Constraint
     Vector2 Normal;
     float Rest;
     float K, Lambda;
+    float LambdaMin, LambdaMax;
 };

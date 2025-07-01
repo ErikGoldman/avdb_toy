@@ -16,9 +16,8 @@
 #include <SDL2/SDL.h>
 #include <chrono>
 #include <cmath>
-#include "World.h"
-#include "physics/BasicObjects.h"
 #include "physics/World.h"
+#include "physics/BasicObjects.h"
 
 // ---------------------------------------------------------------
 // Tunables
@@ -72,9 +71,17 @@ int main(int argc, char **argv)
     // Ground contact represented by a constraint per body
     const Vector2 groundNormal(0.0f, 1.0f);
     for (BodyIndex bi = 1; bi <= 2; ++bi)
+    {
         world.AddConstraint(bi, INVALID, ConstraintType::Normal,
-                            groundNormal,   /*rest=*/0.0f,
-                            world.Settings.KStart);
+                            groundNormal,   0.0f,
+                            world.Settings.KStart, -1e8, 0);
+    }
+
+    /*
+    world.AddConstraint(1, 2, ConstraintType::Normal,
+                        Vector2(0, 0),   0.0f,
+                        world.Settings.KStart, -1e8, 0);
+                        */
 
     // -----------------------------------------------------------
     // Main loop
@@ -82,6 +89,9 @@ int main(int argc, char **argv)
     bool quit = false;
     auto last = std::chrono::high_resolution_clock::now();
 
+    long frame = 0;
+
+    float acc  =0;
     while (!quit)
     {
         // --- handle events
@@ -92,10 +102,13 @@ int main(int argc, char **argv)
 
         // --- fixed‑timestep update
         auto now   = std::chrono::high_resolution_clock::now();
-        float acc  = std::chrono::duration<float>(now - last).count();
+        acc += std::chrono::duration<float>(now - last).count();
         while (acc >= DT) {
             world.Step(DT);
             acc -= DT;
+
+            const Constraint &c = *world.GetConstraint(1);
+            SDL_Log("λ = %.6f   k = %.6f", c.Lambda, c.K);
         }
         last = now;
 
@@ -104,7 +117,7 @@ int main(int argc, char **argv)
         SDL_RenderClear(ren);
 
         SDL_SetRenderDrawColor(ren, 255, 160, 40, 255);
-        for (BodyIndex bi = 0; bi <= world.GetNumBodies(); ++bi)
+        for (BodyIndex bi = 1; bi <= world.GetNumBodies(); ++bi)
         {
             const Body &b = *world.GetBody(bi);
             int sx, sy;
@@ -114,7 +127,9 @@ int main(int argc, char **argv)
 
         // ground line for reference
         SDL_SetRenderDrawColor(ren, 80, 80, 80, 255);
-        SDL_RenderDrawLine(ren, 0, WINDOW_H * 0.75f, WINDOW_W, WINDOW_H * 0.75f);
+        int floorX, floorY;
+        WorldToScreen(Vector2(0, 0), floorX, floorY);
+        SDL_RenderDrawLine(ren, 0, floorY, WINDOW_W, floorY);
 
         SDL_RenderPresent(ren);
 

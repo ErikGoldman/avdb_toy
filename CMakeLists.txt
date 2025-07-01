@@ -25,7 +25,8 @@ FetchContent_MakeAvailable(SDL2)
 add_executable(avbd_viewer
     AvbdToy.cpp
     physics/World.cpp
-    # ... add other *.cpp here ...
+    physics/World.h
+    physics/BasicObjects.h
 )
 
 # C++17, warnings etc.

@@ -24,14 +24,14 @@
 // ---------------------------------------------------------------
 static constexpr int   WINDOW_W = 960;
 static constexpr int   WINDOW_H = 720;
-static constexpr float SCALE     = 60.0f;   // world‑unit → pixel
+static constexpr float SCALE     = 20.0f;   // world‑unit → pixel
 static constexpr float DT        = 1.0f / 60.0f;
 
 // Convert world coordinates (meters) to pixel space
 static inline void WorldToScreen(const Vector2 &p, int &sx, int &sy)
 {
-    sx = static_cast<int>(p.X * SCALE + WINDOW_W * 0.5f);
-    sy = static_cast<int>(WINDOW_H * 0.75f - p.Y * SCALE); // origin at ground
+    sx = static_cast<int>(p.X * SCALE);
+    sy = static_cast<int>(WINDOW_H - p.Y * SCALE); // origin at ground
 }
 
 // Naïve filled‑circle helper (Bresenham variant)
@@ -42,6 +42,27 @@ static void FillCircle(SDL_Renderer *r, int cx, int cy, int radius)
         int dx = static_cast<int>(std::sqrt(radius*radius - dy*dy));
         SDL_RenderDrawLine(r, cx - dx, cy + dy, cx + dx, cy + dy);
     }
+}
+
+static World *Initialize()
+{
+    World *world = new World();
+
+    // Two falling discs stacked — tweak as needed
+    for (int i = 0; i < 100; ++i)
+    {
+        static std::mt19937 rng{ std::random_device{}() };
+        std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+
+        float radius = unit(rng) * 1.5f + 0.25f;
+        world->AddBody({ unit(rng) * 50, unit(rng) * 50 }, {unit(rng) * 10 - 5, unit(rng) * 10 - 5}, radius, 3.14f * radius * radius);
+    }
+
+    world->AddPlane(Vector2(0, 1.0), 2);
+    world->AddPlane(Vector2(1.0, 0.0), 1);
+    world->AddPlane(Vector2(-1.0, 0.0), -45);
+
+    return world;
 }
 
 int main(int argc, char **argv)
@@ -59,31 +80,6 @@ int main(int argc, char **argv)
     SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
 
     // -----------------------------------------------------------
-    // Construct a simple demo world
-    // -----------------------------------------------------------
-    World world;
-
-    // Two falling discs stacked — tweak as needed
-    const float radius = 0.25f;
-    world.AddBody({ 0.0f, 5.0f }, radius, 1.0f);
-    world.AddBody({ 0.0f, 6.0f }, radius, 1.0f);
-
-    // Ground contact represented by a constraint per body
-    const Vector2 groundNormal(0.0f, 1.0f);
-    for (BodyIndex bi = 1; bi <= 2; ++bi)
-    {
-        world.AddConstraint(bi, INVALID, ConstraintType::Normal,
-                            groundNormal,   0.0f,
-                            world.Settings.KStart, -1e8, 0);
-    }
-
-    /*
-    world.AddConstraint(1, 2, ConstraintType::Normal,
-                        Vector2(0, 0),   0.0f,
-                        world.Settings.KStart, -1e8, 0);
-                        */
-
-    // -----------------------------------------------------------
     // Main loop
     // -----------------------------------------------------------
     bool quit = false;
@@ -91,24 +87,34 @@ int main(int argc, char **argv)
 
     long frame = 0;
 
-    float acc  =0;
+    World *world = Initialize();
+
+    float acc = 0;
     while (!quit)
     {
         // --- handle events
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_QUIT) quit = true;
+            if (e.type == SDL_QUIT)
+            {
+                quit = true;
+            }
+            else if (e.type == SDL_KEYDOWN)
+            {
+                if (e.key.keysym.sym == SDLK_SPACE)
+                {
+                    delete world;
+                    world = Initialize();
+                }
+            }
         }
 
         // --- fixed‑timestep update
         auto now   = std::chrono::high_resolution_clock::now();
         acc += std::chrono::duration<float>(now - last).count();
         while (acc >= DT) {
-            world.Step(DT);
+            world->Step(DT);
             acc -= DT;
-
-            const Constraint &c = *world.GetConstraint(1);
-            SDL_Log("λ = %.6f   k = %.6f", c.Lambda, c.K);
         }
         last = now;
 
@@ -116,23 +122,34 @@ int main(int argc, char **argv)
         SDL_SetRenderDrawColor(ren, 30, 30, 30, 255);
         SDL_RenderClear(ren);
 
-        SDL_SetRenderDrawColor(ren, 255, 160, 40, 255);
-        for (BodyIndex bi = 1; bi <= world.GetNumBodies(); ++bi)
+        for (BodyIndex bi = 0; bi < world->GetNumBodies(); ++bi)
         {
-            const Body &b = *world.GetBody(bi);
+            const Body &b = *world->GetBody(bi);
+            SDL_SetRenderDrawColor(ren, b.Color[0],b.Color[1],b.Color[2], 255);
+
             int sx, sy;
             WorldToScreen(b.Pos, sx, sy);
             FillCircle(ren, sx, sy, static_cast<int>(b.Radius * SCALE));
         }
 
-        // ground line for reference
         SDL_SetRenderDrawColor(ren, 80, 80, 80, 255);
-        int floorX, floorY;
-        WorldToScreen(Vector2(0, 0), floorX, floorY);
-        SDL_RenderDrawLine(ren, 0, floorY, WINDOW_W, floorY);
+        for (BodyIndex pi = 0; pi < world->GetNumPlanes(); ++pi)
+        {
+            const Plane &p = world->GetPlane(pi);
+
+            Vector2 tangent(-p.Normal.Y, p.Normal.X);
+            constexpr float len = 100.f;
+            Vector2 p0 = tangent * len + p.Normal * p.Distance;
+            Vector2 p1 = tangent * -1 * len + p.Normal * p.Distance;
+
+            int startX, startY;
+            int endX, endY;
+            WorldToScreen(p0, startX, startY);
+            WorldToScreen(p1, endX, endY);
+            SDL_RenderDrawLine(ren, startX, startY, endX, endY);
+        }
 
         SDL_RenderPresent(ren);
-
         SDL_Delay(1); // yield to OS
     }
 

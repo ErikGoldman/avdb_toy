@@ -3,7 +3,7 @@
 
 typedef uint16_t BodyIndex;
 typedef uint16_t ConstraintIndex;
-static constexpr uint16_t INVALID = 0;
+static constexpr uint16_t INVALID = ~0;
 
 enum ConstraintType
 {
@@ -139,13 +139,13 @@ struct Vector2
 struct BodyScratch
 {
     // inertial
-    Vector2 Y;
-
-    // new pos (used to prevent races)
-    Vector2 NewPos;
+    Vector2 Inertial;
 
     // old pos (used for velocity)
     Vector2 OldPos;
+
+    // old velocity (used to warm start the body with an acceleration guess)
+    Vector2 OldVel;
 };
 
 struct Body
@@ -154,19 +154,28 @@ struct Body
     float Radius;
     float Mass;
     float InvMass;
+    uint8_t Color[3];
 
     BodyScratch Scratch;
 };
 
+struct Plane
+{
+    Vector2 Normal;
+    float Distance;
+};
+
 struct Constraint
 {
-    BodyIndex A, B;
+    BodyIndex A, B, Plane;
     ConstraintIndex NextA, NextB, Next;
-    bool IsActive;
 
     ConstraintType Type;
-    Vector2 Normal;
     float Rest;
     float K, Lambda;
-    float LambdaMin, LambdaMax;
+    float FMin, FMax;
+
+    // "scratch" data precomputed during the initialize step
+    Vector2 Normal, JA, JB;
+    float C0;
 };

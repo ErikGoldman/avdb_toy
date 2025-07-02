@@ -9,7 +9,7 @@ struct WorldSettings
 {
     float Gravity = -9.81f;
     float KStart = 1e4;
-    int Iterations = 3;
+    int Iterations = 4;
 
     float CollisionMargin = 0.01f;
 

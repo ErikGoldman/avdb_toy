@@ -54,7 +54,7 @@ static World *Initialize()
         static std::mt19937 rng{ std::random_device{}() };
         std::uniform_real_distribution<float> unit(0.0f, 1.0f);
 
-        float radius = unit(rng) * 1.5f + 0.25f;
+        float radius = unit(rng) * 1.f + 0.5f;
         world->AddBody({ unit(rng) * 50, unit(rng) * 50 }, {unit(rng) * 10 - 5, unit(rng) * 10 - 5}, radius, 3.14f * radius * radius);
     }
 

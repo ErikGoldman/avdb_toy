@@ -49,12 +49,12 @@ static World *Initialize()
     World *world = new World();
 
     // Two falling discs stacked — tweak as needed
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < 200; ++i)
     {
         static std::mt19937 rng{ std::random_device{}() };
         std::uniform_real_distribution<float> unit(0.0f, 1.0f);
 
-        float radius = unit(rng) * 1.f + 0.5f;
+        float radius = unit(rng) * 2.f + 0.2f;
         world->AddBody({ unit(rng) * 50, unit(rng) * 50 }, {unit(rng) * 10 - 5, unit(rng) * 10 - 5}, radius, 3.14f * radius * radius);
     }
 

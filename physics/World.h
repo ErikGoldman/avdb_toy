@@ -31,7 +31,7 @@ private:
     static constexpr int MAX_BODIES = 3000;
     static constexpr int MAX_PLANES = 5;
     static constexpr int MAX_PLANE_COLLISIONS = 30;
-    static constexpr int MAX_BODY_COLLISIONS = 5;
+    static constexpr int MAX_BODY_COLLISIONS = 10;
     static constexpr int MAX_CONSTRAINTS = 5 * MAX_BODIES;
 
 public:
